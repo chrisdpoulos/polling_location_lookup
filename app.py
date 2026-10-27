@@ -28,7 +28,7 @@ polling_locations = gpd.GeoDataFrame(polling_locations,crs="EPSG:4326")
 
 # Geocoding function
 
-street = st.sidebar.text_input("Enter the Street address", "1901 W Carrol Ave")
+street = st.sidebar.text_input("Enter the street address", "1901 W Carrol Ave")
 city = "Chicago"
 state = "Illinois"
 country = "USA"

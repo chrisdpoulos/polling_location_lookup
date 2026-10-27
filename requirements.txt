@@ -4,3 +4,5 @@ numpy
 requests
 geopandas
 shapely
+geopy
+googlemaps

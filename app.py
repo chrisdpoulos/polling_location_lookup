@@ -77,7 +77,7 @@ gdf = polling_locations_nearby.copy()
 polling_locations_nearby = polling_locations_nearby[['full_address','name','ward_pct']]
 polling_locations_nearby.columns = ['Address','Name','Ward & Precinct']
 
-st.markdown(f"""<b>Polling locations within {buffer_option} of the geocoded location:</b><br><sub>Duplicate occur when polling location serves multiple precincts</sub>""",unsafe_allow_html=True)
+st.markdown(f"""<b>Polling locations within {buffer_option} of the geocoded location:</b><br><sub>Duplicates occur when polling location serves multiple precincts</sub>""",unsafe_allow_html=True)
 st.dataframe(polling_locations_nearby,hide_index=True)
 
 

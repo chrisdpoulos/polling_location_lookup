@@ -25,6 +25,7 @@ gmaps = googlemaps.Client(key=api_key)
 polling_locations = gpd.read_file("data.geojson",driver="GeoJSON")
 
 polling_locations = gpd.GeoDataFrame(polling_locations,crs="EPSG:4326")
+polling_locations = polling_locations.to_crs(epsg=3425)
 
 # Geocoding function
 
@@ -62,22 +63,46 @@ df = pd.DataFrame({
 st.markdown(f"<b>You entered the address: </b><br><br>{location[0]}", unsafe_allow_html=True)
 
 geocoded = gpd.GeoDataFrame(geocoded,geometry=gpd.points_from_xy(df.Longitude, df.Latitude),crs="EPSG:4326")
+geocoded = geocoded.to_crs(epsg=3425)
 
 # Select polling_location in 2 miles of the geocoded location
 # Make a distance radio button 1 mile or two mile
 buffer_option = st.sidebar.radio("Select the polling location search distance", ("1 mile", "2 miles"))
 buffer_distance = 1609.34 if buffer_option == "1 mile" else 2 * 1609.34  # 1 mile or 2 miles in meters
-geocoded_buffer = geocoded.to_crs(epsg=3857).buffer(buffer_distance)
-geocoded_buffer = geocoded_buffer.to_crs(epsg=4326)
+geocoded_buffer = geocoded.buffer(buffer_distance)
+
 
 polling_locations_nearby = polling_locations[ polling_locations.geometry.within(geocoded_buffer.unary_union) ]
 
+# add distance from geocoded location in miles
+
+polling_locations_nearby['distance_to_location'] = polling_locations_nearby.geometry.distance(geocoded.geometry.iloc[0])/ 1609.34 
+
+# sort by distance to the geocoded location
+polling_locations_nearby = polling_locations_nearby.sort_values(by='distance_to_location')
+
 gdf = polling_locations_nearby.copy()
 
-polling_locations_nearby = polling_locations_nearby[['full_address','name','ward_pct']]
-polling_locations_nearby.columns = ['Address','Name','Ward & Precinct']
+polling_locations_nearby = polling_locations_nearby[['full_address','name','ward_pct','distance_to_location']]
+polling_locations_nearby.columns = ['Address','Name','Ward & Precinct','Distance (Miles)']
 
-st.markdown(f"""<b>Polling locations within {buffer_option} of the geocoded location:</b><br><sub>Duplicates occur when polling location serves multiple precincts</sub>""",unsafe_allow_html=True)
-st.dataframe(polling_locations_nearby,hide_index=True)
+# Merge Ward & Precinct if polling_locations_nearby['Name'] has duplicates
+polling_locations_nearby = polling_locations_nearby.groupby('Name', as_index=False).agg({
+    'Address': 'first',
+    'Ward & Precinct': ', '.join,
+    'Distance (Miles)': 'first'
+})
+
+# make Name a link https://www.google.com/maps/search/?api=1&query=ADDRESS where ADDRESS is the 'Address'
+
+polling_locations_nearby['Name'] = polling_locations_nearby.apply(lambda x: f'<a href="https://www.google.com/maps/search/?api=1&query={x["Address"]}" target="_blank">{x["Name"]}</a>', axis=1)
+
+st.markdown(f"""<b>Polling locations within {buffer_option} of the geocoded location:</b>""",unsafe_allow_html=True)
+
+# for each name, display the polling location as a link in bulleted list, sort by distance
+polling_locations_nearby = polling_locations_nearby.sort_values(by='Distance (Miles)')
+
+for index, row in polling_locations_nearby.iterrows():
+    st.markdown(f"- {row['Name']} ({row['Distance (Miles)']:.2f} miles)- Serves: {row['Ward & Precinct']}", unsafe_allow_html=True)
 
 

@@ -14,9 +14,14 @@ import os
 
 st.set_page_config(page_title=None, page_icon=None, layout="centered", initial_sidebar_state="expanded", menu_items=None)
 
-# Initialize Google Maps client with API key using st.secrets
-
-api_key = st.secrets["GM_API_KEY"]
+# Get api key. Try st.secrets except StreamlitSecretNotFoundError(error_msg)
+try:
+    if "GM_API_KEY" in st.secrets:
+        api_key = st.secrets["GM_API_KEY"]
+    else:
+        api_key = os.getenv("GM_API_KEY")
+except Exception as e:
+    api_key = os.getenv("GM_API_KEY")
 
 gmaps = googlemaps.Client(key=api_key)
 
@@ -60,7 +65,7 @@ df = pd.DataFrame({
     "Longitude":[long]
 })
 
-st.markdown(f"<b>You entered the address: </b><br><br>{location[0]}", unsafe_allow_html=True)
+st.markdown(f"<b>You entered the address:</b><br><br>{location[0]}<br><br>", unsafe_allow_html=True)
 
 geocoded = gpd.GeoDataFrame(geocoded,geometry=gpd.points_from_xy(df.Longitude, df.Latitude),crs="EPSG:4326")
 geocoded = geocoded.to_crs(epsg=3425)
@@ -93,6 +98,12 @@ polling_locations_nearby = polling_locations_nearby.groupby('Name', as_index=Fal
     'Distance (Miles)': 'first'
 })
 
+# Format name so first letter of every word is capitalized
+polling_locations_nearby['Name'] = polling_locations_nearby['Name'].apply(lambda x: ' '.join([i.capitalize() for i in x.split(' ')]))
+
+# If words like St are used add a period after them
+polling_locations_nearby['Name'] = polling_locations_nearby['Name'].apply(lambda x: x.replace('St', ' St.'))
+
 # make Name a link https://www.google.com/maps/search/?api=1&query=ADDRESS where ADDRESS is the 'Address'
 
 polling_locations_nearby['Name'] = polling_locations_nearby.apply(lambda x: f'<a href="https://www.google.com/maps/search/?api=1&query={x["Address"]}" target="_blank">{x["Name"]}</a>', axis=1)
@@ -101,6 +112,7 @@ st.markdown(f"""<b>Polling locations within {buffer_option} of the geocoded loca
 
 # for each name, display the polling location as a link in bulleted list, sort by distance
 polling_locations_nearby = polling_locations_nearby.sort_values(by='Distance (Miles)')
+
 
 for index, row in polling_locations_nearby.iterrows():
     st.markdown(f"- {row['Name']} ({row['Distance (Miles)']:.2f} miles)- Serves: {row['Ward & Precinct']}", unsafe_allow_html=True)
